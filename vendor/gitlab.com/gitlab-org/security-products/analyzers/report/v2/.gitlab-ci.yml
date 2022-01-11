@@ -1,0 +1,3 @@
+include:
+  - project: 'gitlab-org/security-products/ci-templates'
+    file: '/includes-dev/go.yml'

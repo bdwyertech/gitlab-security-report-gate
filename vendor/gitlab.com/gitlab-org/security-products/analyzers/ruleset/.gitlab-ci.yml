@@ -1,0 +1,48 @@
+image: golang:1.15
+
+include:
+  - template: Dependency-Scanning.gitlab-ci.yml
+  - template: SAST.gitlab-ci.yml
+  - template: Secret-Detection.gitlab-ci.yml
+
+test:
+  script:
+    - go get -t ./...
+    - go test -race -cover -v ./...
+  coverage: '/coverage: \d+.\d+% of statements/'
+
+lint_code:
+  script:
+    - go get -u golang.org/x/lint/golint
+    - golint -set_exit_status ./...
+
+go mod tidy:
+  script:
+    - go mod tidy
+    - git diff --exit-code go.mod go.sum
+
+danger-review:
+  image: registry.gitlab.com/gitlab-org/gitlab-build-images:danger
+  stage: test
+  needs: []
+  only:
+    - branches
+  except:
+    refs:
+      - master
+    variables:
+      - $DANGER_DISABLED == "true"
+  variables:
+    DANGER_BOT_VERSION: v0.0.2
+    DANGER_BOT_ANALYZERS_FILE_URL: https://gitlab.com/gitlab-org/security-products/danger-bot/-/raw/${DANGER_BOT_VERSION}/analyzers/Dangerfile
+    DANGER_BOT_META_DATA_FILE_URL: https://gitlab.com/gitlab-org/security-products/danger-bot/-/raw/${DANGER_BOT_VERSION}/metadata/Dangerfile
+    DANGER_BOT_CHANGELOG_FILE_URL: https://gitlab.com/gitlab-org/security-products/danger-bot/-/raw/${DANGER_BOT_VERSION}/changelog/Dangerfile
+    DANGER_BOT_CHANGES_SIZE_FILE_URL: https://gitlab.com/gitlab-org/security-products/danger-bot/-/raw/${DANGER_BOT_VERSION}/changes_size/Dangerfile
+  script:
+    - git version
+    - wget $DANGER_BOT_ANALYZERS_FILE_URL -P .
+    - wget $DANGER_BOT_META_DATA_FILE_URL -P danger/metadata/
+    - wget $DANGER_BOT_CHANGELOG_FILE_URL -P danger/changelog/
+    - wget $DANGER_BOT_CHANGES_SIZE_FILE_URL -P danger/changes_size/
+    - danger
+
